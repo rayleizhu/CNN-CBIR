@@ -31,15 +31,29 @@ def load_image_and_bbs(im_path, bb_path):
     return img, bb_mat
 
 
-def show_img_with_bbs(im, bbs, bb_format='xyhw_mat'):
-    assert bb_format in ['xyhw_mat', 'corner_list']
-    if bb_format == 'xyhw_mat':
+def show_img_with_bbs(im, bbs, bb_format='xywh_mat'):
+    assert bb_format in ['xywh_mat', 'corner_list', 'ijhw_mat']
+    if bb_format == 'xywh_mat':
         corners = []
         for row in bbs:
             x_l = row[0]
             x_r = row[0] + row[2]
             y_u = row[1]
             y_d = row[1] + row[3]
+            corners.append(np.int32([[x_l, y_u], 
+                                     [x_l, y_d],
+                                     [x_r, y_d],
+                                     [x_r, y_u]
+                                    ]
+                                   ).reshape(-1, 1, 2)
+                          )
+    elif bb_format == 'ijhw_mat':
+        corners = []
+        for row in bbs:
+            x_l = row[1]
+            x_r = row[1] + row[3]
+            y_u = row[0]
+            y_d = row[0] + row[2]
             corners.append(np.int32([[x_l, y_u], 
                                      [x_l, y_d],
                                      [x_r, y_d],

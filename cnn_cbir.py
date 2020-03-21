@@ -16,7 +16,7 @@ from tqdm import tqdm
 import logging
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def rmac(x, L=3, ovr=0.4, norm=True, eps=1e-6, padding=0):
@@ -84,7 +84,8 @@ class RMAC(nn.Module):
     
 
 class FeatureExtractor:
-    def __init__(self, backbone='vgg16', cache_dir='feature_cache', pool='rmac', eps=1e-6):
+    def __init__(self, backbone='vgg16', cache_dir='feature_cache', pool='rmac', eps=1e-6,
+                 use_gpu=True):
         """
         args:
             backbone: the model used for feature extraction
@@ -113,6 +114,15 @@ class FeatureExtractor:
         self.eps = eps
         self.pool = pool
         
+        if use_gpu and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
+            
+        self.cnn.to(self.device)
+#         print('Using device: ', self.device)
+#         logging('current device: {:s}'.format(self.device))
+        
     def _map_im_path_to_cache_path(self, im_path):
         im_name = os.path.basename(im_path)
         cache_name = os.path.splitext(im_name)[0] + '.pth'
@@ -122,10 +132,10 @@ class FeatureExtractor:
     def get_im_feature_by_path(self, im_path, force_compute=False):
         cache_path = self._map_im_path_to_cache_path(im_path)
         if (not force_compute) and os.path.isfile(cache_path):
-            logging.info('cached feature for {:s} is found, directly loading it.'.format(im_path))
+            logging.debug('cached feature for {:s} is found, directly loading it.'.format(im_path))
             fea_dict_im = torch.load(cache_path)
         else:
-            logging.info('computing feature for {:s}...'.format(im_path))
+            logging.debug('computing feature for {:s}...'.format(im_path))
             im = cv2.imread(im_path)
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             fea_dict_im = self.compute_im_feature(im)
@@ -134,7 +144,7 @@ class FeatureExtractor:
     
     def get_bb_mat(self, patches, im_path):
         bbs = []
-        logging.info('computing bounding boxes in {:s}'.format(im_path))
+        logging.debug('computing bounding boxes in {:s}'.format(im_path))
         for patch in patches:
             feat_dict_im = self.get_im_feature_by_path(im_path)
             feat_dict_patch = self.compute_im_feature(patch, pool='mac')
@@ -151,16 +161,17 @@ class FeatureExtractor:
     def get_db_feature_matrix(self, im_paths, force_compute=False):
         cache_path = os.path.join(self.cache_dir, 'db_fea_mat.pth')
         if (not force_compute) and os.path.isfile(cache_path):
-            logging.info('cached database feature matrix found in {:s}, loading it directly.'.format(cache_path))
+            logging.info('cached database feature matrix is found in {:s}, loading it directly.'.format(cache_path))
             db_fea_mat = torch.load(cache_path)
         else:
-            logging.info('computing database feature matrix...')
+            logging.info('computing feature for {:d} images...'.format(len(im_paths)))
             db_fea_mat = []
-            for im_path in im_paths:
+            for im_path in tqdm(im_paths):
                 fea_dict_im = self.get_im_feature_by_path(im_path, force_compute)
                 db_fea_mat.append(fea_dict_im['ag_feat_vec'])
             db_fea_mat = torch.stack(db_fea_mat)
-            torch.save(db_fea_mat, cache_path)  
+            torch.save(db_fea_mat, cache_path)
+            logging.info('database feature matrix is computed and saved!')
         return db_fea_mat
     
     def compute_top_matches(self, im, db_fea_mat, top_k=50):
@@ -201,7 +212,7 @@ class FeatureExtractor:
         assert aggregation in ['sum', 'ave'], 'Only sum and ave aggregation are supported.'
         
         with torch.no_grad():
-            im_tensor = self.transform(im).unsqueeze(0)
+            im_tensor = self.transform(im).unsqueeze(0).to(self.device)
             fea = self.cnn.features(im_tensor)
         
             _, c_im, h_im, w_im  = im_tensor.size()
@@ -250,81 +261,6 @@ class FeatureExtractor:
                 raise NotImplementedError('Only mac and rmac are supported.')
         
     
-#     def get_feature_raw(self, img, pool='rmac'):
-#         '''
-#         args:
-#             img: a NCHW tensor
-#             pool : the final pooling method to get verctorized feature
-#         return:
-#             fea: a tensor of shape (N, C) if 'mac' pooling is used,
-#                  or (N, R, C) if 'rmac' pooling is used.
-#             regions_ijhw: a numpy array of shape (R, 4), where R is the number of regions,
-#                           this is only valid when you are using 'rmac' feature
-#         '''
-        
-#         assert pool in ['rmac', 'mac']
-#         n, h_im, w_im, c_im = img.size() 
-        
-#         fea = self.fea_extractor.features(x)
-#         n, h_f, w_f, c_f = fea.size()
-        
-#         s_h = h_im / h_f
-#         s_w = w_im / w_f
-        
-#         if pool == 'rmac':
-#             fea, regions_ijhw = rmac(fea, L=3, over=0.5, padding=0, norm=True) # (N, R, C)
-#             regions_ijhw = regions_ijhw * np.array([[s_h, s_w, s_h, s_w ]])
-#             regions_ijhw = np.floor(regions_ijhw)
-#             return fea, regions_ijhw
-#         elif pool == 'mac'
-#             fea = F.max_pool2d(fea, (fea.size(2), fea.size(3))).squeeze() # (N, C, 1, 1)
-#             fea = fea / (torch.norm(fea, p=2, dim=1, keep_dim=True) + eps)
-#             fea = fea.squeeze() # (N, C)
-#         else:
-#             raise NotImplementedError("Only 'mac' and 'rmac' is supported currently!")
-#         return fea, np.array([[0, 0, h_im, w_im]]) 
-    
-    
-#     def get_feature_for_retrieval(self, fea_raw):
-#         '''
-#             args:
-#                 fea: a (N, R, C) tensor or (N, C) tensor
-#             return:
-#                 fea_r: a (N, C) tensor
-#         '''
-#         size_fea = fea_raw.size()
-#         if len(size_fea) == 2:
-#             return fea_raw
-#         elif len(size_fea) == 3:
-#             return torch.sum(fea_raw, dim=1) / size_fea[1]
-
-            
-#     def get_fea_sim(self, fea1, fea2, require_norm=False):
-#         '''
-#         args:
-#             fea1: (N, C) tensor
-#             fea2: (M, C) tensor
-#             require_norm: boolean, tells if tensors should be l2-normalized first
-#         return:
-#             cosine_sim: cosine similarity matrix of shape (N, M)
-#         '''
-#         if require_norm:
-#             fea1 = fea1 / (torch.norm(fea1, p=2, dim=1, keep_dim=True) + eps)
-#             fea2 = fea2 / (torch.norm(fea2, p=2, dim=1, keep_dim=True) + eps)
-#         cosine_sim = torch.mm(fea1, fea2.transpose(0, -1))
-#         return cosine_sim
-    
-#     def get_transform(self):
-#         return self.transform
-    
-#     def save_fea(self, fea_dict, save_path):
-#         torch.save(fea_dict, save_path)
-        
-        
-#     def load_fea(self, load_path):
-#         pass
-        
-    
 
 class SearchEngine:
     def __init__(self, db_root, fea_extractor):
@@ -345,7 +281,7 @@ class SearchEngine:
     
     
     def build(self, force_compute=False):
-        logging.info('Write database feature matrix into memory...')
+        logging.info('building database feature matrix...')
         self.db_fea_mat = self.fea_extractor.get_db_feature_matrix(self.im_paths,
                                                                    force_compute)
 #         if force_compute:

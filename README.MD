@@ -4,7 +4,7 @@
 
 ## 1. Results
 
-### 1.1 image retrieval and object localization for No. 1 - 5 query
+### 1.1 image retrieval and object localization for No. 1 - 5 query (top_k = 10)
 
 The following table has 11 rows, 5 columns, each column is for one query. In each column, the first one is query image, followed with ten retrieved ones.
 You can click image to see big pictures in `result` directory
@@ -30,7 +30,7 @@ TBA.
 
 ## 2. How to use
 
-Go to the [demo.ipynb]() for a step-by-step tutorial. 
+Go to the [demo.ipynb](https://github.com/rayleizhu/CNN-CBIR/blob/master/Demo.ipynb) for a step-by-step tutorial. 
 If you want to further develop based on this repository, you may refer to section 4:  design, implementation, features, discussion.
 
 
@@ -40,7 +40,9 @@ In the instance search task, given a image with one or multiple object bounding 
 
 Basically, we use [VGG16](https://arxiv.org/pdf/1409.1556.pdf) + [RMAC (regional maximum activation of convolutions)](https://arxiv.org/pdf/1511.05879.pdf) layer to get feature representation for retrieval and object localization.
 
-![VGG16 architechture](assets/VGG16-architecture-16.png "VGG16 architechture")
+| VGG16 architecture |
+|-|
+|![VGG16 architechture](assets/VGG16-architecture-16.png "VGG16 architechture")|
 
 ### 3.1 pipeline
 
@@ -69,8 +71,9 @@ We localize image by computing cosine similarity vgg16 pool5  **global max-pooli
 #### we do not use approximate integral max-pooling
 
 The approximate integral max-pooling operation described in [paper](https://arxiv.org/pdf/1511.05879.pdf) can reduce time complexity for RMAC caculation from $O(W^2 \dot H^2)$ to $O(W \dot H)$, using the [integral image trick](https://en.wikipedia.org/wiki/Summed-area_table). 
-
-![approximate integral max-pooling](assets/approximated_max_pooling.png)
+|in sction 5 of paper|
+|-|
+|![approximate integral max-pooling](assets/approximated_max_pooling.png)|
 
 This is of course quite a gain **for serialized scenario**. However, since computing integeral image is actually a dynamic prgramming strategy which involves with heavy data dependency, it's **Not friently to parallel computing**, thus useless even harmful if you use GPU for inference.
 
@@ -81,12 +84,18 @@ Of course I didn't implement **approximate** integral max-pooling, as depicted a
 #### no extra PCA-whitening  and L2-normalization step to post-process regional features
 
 I don't comprehend the motivation of these two steps. Then I just keep it simple :).
-![extra pca whithening and L2 normalization](assets/pca_l2.png)
+
+|in section 4 of paper|
+|-|
+|![extra pca whithening and L2 normalization](assets/pca_l2.png)|
 
 #### no re-ranking and query expansion
 
 Again, I just want to keep my system simple, so such extensions are not included. But maybe I will add it later.
-![re-rank and qe](assets/rerank_qe.png)
+
+|in section 4 of paper|
+|-|
+|![re-rank and qe](assets/rerank_qe.png)|
 
 
 ### 3.3 Analysis
@@ -115,6 +124,7 @@ TBA
 
 ## 6. TODO
 
+* add table of contents in README.md
 * add dynamical indexing function
 * unify SIFT-BOW/SIFT-TFIDF to the this framework.
 * query expansion and reranking

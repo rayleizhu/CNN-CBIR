@@ -100,6 +100,9 @@ Again, I just want to keep my system simple, so such extensions are not included
 
 ### 3.3 Analysis
 
+#### Why don't we remove FC layers in VGG16?
+* if not, VGG16 can only receive size fixed (224 * 224) input, which means we must resize all images, this may be harmful since objects will be distorted.
+* FC layers occupy most parameters of VGG, removing them makes the model light, more efficient.
 
 #### What's the strength of RMAC?
 * Objects have have varied size in different images, RMAC feature takes into account the effect of scale, thus makes retrieval more precise.

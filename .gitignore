@@ -1,6 +1,4 @@
 __pycache__
 *.pyc
-*.jpg
-*.png
 *.pth
 .ipynb_checkpoints/

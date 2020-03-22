@@ -30,6 +30,8 @@
 
 * [How to normalize embedding vectors? - pytorch forum](https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209)
 
+* [How to check if pytorch is using the GPU? - StackOverflow](https://stackoverflow.com/a/53374933)
+
 
 
 ## Dev Notes
@@ -38,4 +40,11 @@
 
 2. [I wonder why Pytorch uses PIL not the cv2 - pytorch forum](https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/3)
 
-3.
+
+## Difference between 
+
+
+## TODO
+1. use batached dataloader to speed up feature extraction
+2. incooprate other retreival methodology (e.g. SIFT-BOW) to the same framework
+

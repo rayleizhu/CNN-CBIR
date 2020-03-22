@@ -19,35 +19,29 @@ LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
-def rmac(x, L=3, ovr=0.4, norm=True, eps=1e-6, padding=0):
-#     ovr = 0.4 # desired overlap of neighboring regions
-   
-    # possible number regions for the longer dimension
-    # written in this way, we can control the maximum number of siliding windows
-#     possible_ms = np.array([1, 2, 3, 4, 5, 6, 7])
+def rzac(x, z='m', l0=1, L=3, ovr=0.4, norm=True, eps=1e-6, padding=0):
+    assert z in ['m', 'a']
     N, C, H, W = x.size()
     w = np.minimum(W, H) # window size at scale 1
-#     b = (np.maximum(H, W) - w)/possible_ms # step sizes for different possible number of regions
-
-    # we want the number of region that makes the overlapping is as close as possilble to 0.4
-    # steps[idx] regions for long dimension
-    # (tmp, idx) = torch.min(torch.abs(((w**2 - w*b)/w**2)-ovr), 0)
-#     idx = np.argmin(np.abs((1-b/w) - ovr))
-    
-#     m = possible_ms[idx]
     
     regions_ijww = []
     fea = []
-    for l in range(1, L+1):
+    for l in range(l0, l0+L):
         wl = int(np.floor(2*w/(l+1))) # window size at scale l
         wl = np.maximum(wl, 2)
         sl = int(np.floor((1-ovr)*wl)) # stride size at scale l
         sl = np.maximum(sl, 1)
         pl= padding if padding is not None else sl
-        xl = F.max_pool2d(x,
-                          kernel_size=(wl, wl),
-                          stride=(sl, sl),
-                          padding=(pl, pl))   
+        if z == 'm':
+            xl = F.max_pool2d(x,
+                              kernel_size=(wl, wl),
+                              stride=(sl, sl),
+                              padding=(pl, pl))   
+        else: # z == 'a'
+            xl = F.avg_pool2d(x,
+                              kernel_size=(wl, wl),
+                              stride=(sl, sl),
+                              padding=(pl, pl)) 
         newh, neww = xl.size(2), xl.size(3)
         regions_ijww += [ (i*sl, j*sl, wl, wl) for i in range(newh) for j in range(neww)]
         fea.append(xl.view(N, C, -1))
@@ -61,19 +55,23 @@ def rmac(x, L=3, ovr=0.4, norm=True, eps=1e-6, padding=0):
     return fea, regions_ijww
 
 
-class RMAC(nn.Module):
+class RZAC(nn.Module):
 
-    def __init__(self, L=3, over=0.4, norm=True, eps=1e-6, padding=0):
-        super(RMAC, self).__init__()
+    def __init__(self, z='m', l0=1, L=3, ovr=0.4, norm=True, eps=1e-6, padding=0):
+        super(RZAC, self).__init__()
+        self.z = z
+        self.l0 = l0
         self.L = L
-        self.over = over
+        self.ovr = ovr
         self.norm = norm
         self.eps = eps
         self.padding = padding
 
     def forward(self, x):
-        return rmac(x, L=self.L,
-                       over=self.over,
+        return rzac(x, z = self.z,
+                       l0 = self.l0,
+                       L=self.L,
+                       ovr=self.ovr,
                        norm = self.norm,
                        eps = self.eps,
                        padding=self.padding)
@@ -84,8 +82,14 @@ class RMAC(nn.Module):
     
 
 class FeatureExtractor:
-    def __init__(self, backbone='vgg16', cache_dir='feature_cache', pool='rmac', eps=1e-6,
-                 use_gpu=True):
+    def __init__(self, backbone='vgg16',
+                       cache_dir='feature_cache',
+                       pool='rmac',
+                       l0=1,
+                       L=3,
+                       ovr=0.5,
+                       eps=1e-6,
+                       use_gpu=True):
         """
         args:
             backbone: the model used for feature extraction
@@ -102,24 +106,32 @@ class FeatureExtractor:
             
         for param in self.cnn.parameters():
             param.requires_grad = False
+        
         self.cnn.eval()
+        
+        
+        self.cache_dir = cache_dir
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        self.pool = pool
+        self.l0 = l0
+        self.L = L
+        self.ovr = ovr
+        self.eps = eps
+        
+        
+        if use_gpu and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
+        self.cnn.to(self.device)
+            
         
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         self.transform = transforms.Compose([ transforms.ToTensor(),
                                               normalize])
         
-        self.cache_dir = cache_dir
-        os.makedirs(cache_dir, exist_ok=True)
-        self.eps = eps
-        self.pool = pool
-        
-        if use_gpu and torch.cuda.is_available():
-            self.device = torch.device('cuda')
-        else:
-            self.device = torch.device('cpu')
-            
-        self.cnn.to(self.device)
 #         print('Using device: ', self.device)
 #         logging('current device: {:s}'.format(self.device))
         
@@ -142,7 +154,11 @@ class FeatureExtractor:
             torch.save(fea_dict_im, cache_path)
         return fea_dict_im
     
-    def get_bb_mat(self, patches, im_path):
+    def get_bb_mat(self, patches, im_path, sp_level=1):
+        '''
+        set sp_level to l will suppress bounding boxes at and below level l.
+        To avoid suppression, set it to 0 instead.
+        '''
         bbs = []
         logging.debug('computing bounding boxes in {:s}'.format(im_path))
         for patch in patches:
@@ -153,10 +169,24 @@ class FeatureExtractor:
             similarity = torch.matmul(feat_dict_im['reg_feat_mat'],
                                       feat_dict_patch['ag_feat_vec'])
             logging.debug('similarity.size(): {:s}'.format(str(similarity.size())))
+            logging.debug('similarity tensor: {:s}'.format(str(similarity)))
+            
+            # supress big bounding box
+            hw = feat_dict_im['regions_ijhw'][:, [2, 3]]
+            max_hw = np.amax(hw, axis=0, keepdims=True)
+#             sp_level = 1
+            mask = hw < np.floor(max_hw * 2/(sp_level+1))
+            mask = mask[:, 0].astype(np.float32)
+#             mask = np.logical_and(mask[:, 0], mask[:, 1])
+            mask = torch.from_numpy(mask).to(similarity.device)
+            similarity = similarity * mask
+            logging.debug('similarity tensor after suprressing: {:s}'.format(str(similarity)))
+            
             val, ind = torch.max(similarity, dim=0)
             bb = feat_dict_im['regions_ijhw'][ind.item()]
             bbs.append(bb)
-        return np.array(bbs)      
+        return np.array(bbs)
+    
             
     def get_db_feature_matrix(self, im_paths, force_compute=False):
         cache_path = os.path.join(self.cache_dir, 'db_fea_mat.pth')
@@ -191,13 +221,6 @@ class FeatureExtractor:
             img: a CHW, RGB numpy array image
             pool: str,the final pooling method to get verctorized feature
             aggregation: str, the method used for feature aggregation
-            cache_dir: direc.tory for caching features, if set to None, feature won't
-                       be cached.
-            im_name: file name for cached feature, note that, the suffix will be replaced
-                     by '.pth'
-            eps: float, eps for L2 normalization
-            recompute: boolean, whether force to recompute instead of loading cached feature
-            
         return:
             fea_dict: a dict {'fea_mat': fea_mat, 'regions_ijhw': regions_ijhw,
                      'aggr_fea': aggr_fea}, where fea_mat is a raw feature matrix
@@ -208,9 +231,22 @@ class FeatureExtractor:
         if pool is None:
             pool = self.pool
             
-        assert pool in ['mac', 'rmac'], 'Only mac and rmac are supported.'
-        assert aggregation in ['sum', 'ave'], 'Only sum and ave aggregation are supported.'
+        assert pool in ['mac', 'aac', 'rmac', 'raac']
+        assert aggregation in ['sum', 'ave']
         
+        if pool in ['rmac', 'raac']:
+            pool_layer = RZAC(z=pool[1],
+                               l0=self.l0,
+                               L=self.L,
+                               ovr=self.ovr,
+                               eps=self.eps)
+        elif pool == 'mac':
+            pool_layer = nn.AdaptiveMaxPool2d(output_size=(1, 1))
+            
+        else: #pool == 'aac'
+            pool_layer = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+         
+                  
         with torch.no_grad():
             im_tensor = self.transform(im).unsqueeze(0).to(self.device)
             fea = self.cnn.features(im_tensor)
@@ -220,8 +256,9 @@ class FeatureExtractor:
             s_h = h_im / h_f
             s_w = w_im / w_f
 
-            if pool == 'rmac':
-                reg_feat_mat, regions_ijhw = rmac(fea, L=3, ovr=0.5, padding=0, norm=True) # (1, R, C)
+            if pool in ['rmac', 'raac']:
+#                 reg_feat_mat, regions_ijhw = rmac(fea, L=3, ovr=0.5, padding=0, norm=True) # (1, R, C)
+                reg_feat_mat, regions_ijhw = pool_layer(fea)
 
                 # TODO: add PCA-whitening and another L2 normalization as post-processing here
 
@@ -251,15 +288,12 @@ class FeatureExtractor:
                         'regions_ijhw': regions_ijhw,
                         'ag_feat_vec': ag_feat_vec}
 
-            elif pool == 'mac':
-                feat_vec = F.max_pool2d(fea, (h_f, w_f)).squeeze() # (1, c, h_f, w_f) -> (c, )
+            else:  # aac or mac
+                feat_vec = pool_layer(fea).squeeze() # (1, c, h_f, w_f) -> (c, )
                 feat_vec = feat_vec / (torch.norm(feat_vec, p=2, dim=0, keepdim=True) + self.eps)
                 return {'reg_feat_mat': feat_vec.unsqueeze(0),
                         'regions_ijhw': np.array([[0, 0, h_im, w_im]]),
                         'ag_feat_vec': feat_vec}
-            else:
-                raise NotImplementedError('Only mac and rmac are supported.')
-        
     
 
 class SearchEngine:
@@ -284,15 +318,6 @@ class SearchEngine:
         logging.info('building database feature matrix...')
         self.db_fea_mat = self.fea_extractor.get_db_feature_matrix(self.im_paths,
                                                                    force_compute)
-#         if force_compute:
-#             os.makedirs(cache_dir, exists_ok=True)
-#             for im_path in tqdm(self.im_paths):
-#                 im_name = os.path.basename(im_path)
-#                 im = cv2.imread(im_path)[:, :, ::-1]
-#                 im_fea = self.fea_extractor.compute_im_feature_by_path(im_path,
-#                                                                        recompute=True)
-#             self.db_fea_mat = self.fea_extractor.compute_db_fea_mat(self.im_paths,
-#                                                                     recompute=True)
     
     
     def retrieve_img(self, img, top_k=50):
@@ -303,18 +328,13 @@ class SearchEngine:
         return:
             result: a list of length top_k, each item is a (im_path, sim_score) tuple
         '''
-#         query_fea, _ = self.fea_extractor.compute_feature(img,
-#                                                           pool='rmac')
-        
         scores, inds = self.fea_extractor.compute_top_matches(img,
                                                               self.db_fea_mat,
                                                               top_k=top_k)
         result = []
         for i in range(top_k):
             result.append((self.im_paths[inds[i]], scores[i].item()))
-#         result = self.fea_extractor.get_top_matches(img,
-#                                                     self.im_paths,
-#                                                     top_k=top_k)
+            
         return result
     
     
@@ -354,7 +374,7 @@ class SearchEngine:
         
         args:
             img: CHW, RGB numpy array image
-            bbs: a (n, 4) numpy array representing xyhw bounding boxes
+            bbs: a (n, 4) numpy array representing xywh bounding boxes
         return:
             masked_img: image with region outside bounding boxes masked by zeros
             patches: list of n CHW, RGB patches containing single object

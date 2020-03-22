@@ -96,7 +96,7 @@ Here is the table for these techincal details described in paper. Click image to
 
 | approximate integral max-pooling in section 5 of paper | AML refinement (section 5) | regional feature post-processing (section 4) | re-ranking and query expansion (section 6) |
 |-|-|-|-|
-|![approximate integral max-pooling](../assets/approximated_max_pooling.png)| ![AML refinement](../assets/aml.png) |![extra pca whithening and L2 normalization](assets/pca_l2.png)|![re-rank and qe](assets/rerank_qe.png)|
+|![approximate integral max-pooling](../assets/approximated_max_pooling.png)| ![AML refinement](../assets/aml.png) |![extra pca whithening and L2 normalization](../assets/pca_l2.png)|![re-rank and qe](../assets/rerank_qe.png)|
 
 
 ##  Analysis

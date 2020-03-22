@@ -70,12 +70,7 @@ We localize image by computing cosine similarity vgg16 pool5  **global max-pooli
 
 #### we do not use approximate integral max-pooling
 
-The approximate integral max-pooling operation described in [paper](https://arxiv.org/pdf/1511.05879.pdf) can reduce time complexity for RMAC caculation from $O(W^2 \dot H^2)$ to $O(W \dot H)$, using the [integral image trick](https://en.wikipedia.org/wiki/Summed-area_table). 
-|in sction 5 of paper|
-|-|
-|![approximate integral max-pooling](assets/approximated_max_pooling.png)|
-
-This is of course quite a gain **for serialized scenario**. However, since computing integeral image is actually a dynamic prgramming strategy which involves with heavy data dependency, it's **Not friently to parallel computing**, thus useless even harmful if you use GPU for inference.
+The approximate integral max-pooling operation described in [paper](https://arxiv.org/pdf/1511.05879.pdf) can reduce time complexity for RMAC caculation from $O(W^2 \dot H^2)$ to $O(W \dot H)$, using the [integral image trick](https://en.wikipedia.org/wiki/Summed-area_table). This is of course quite a gain **for serialized scenario**. However, since computing integeral image is actually a dynamic prgramming strategy which involves with heavy data dependency, it's **Not friently to parallel computing**, thus useless even harmful if you use GPU for inference.
 
 #### we don't apply approximate max-pooling localization refinement
 
@@ -85,17 +80,14 @@ Of course I didn't implement **approximate** integral max-pooling, as depicted a
 
 I don't comprehend the motivation of these two steps. Then I just keep it simple :).
 
-|in section 4 of paper|
-|-|
-|![extra pca whithening and L2 normalization](assets/pca_l2.png)|
-
 #### no re-ranking and query expansion
 
 Again, I just want to keep my system simple, so such extensions are not included. But maybe I will add it later.
 
-|in section 4 of paper|
-|-|
-|![re-rank and qe](assets/rerank_qe.png)|
+Here is the table for techincal details described in paper. Click image to zoom in.
+| approximate integral max-pooling in section 5 of paper | regional feature post-processing (section 4) |re-ranking and query expansion (section 6) |
+|-|-|-|
+|![approximate integral max-pooling](assets/approximated_max_pooling.png)|![extra pca whithening and L2 normalization](assets/pca_l2.png)|![re-rank and qe](assets/rerank_qe.png)|
 
 
 ### 3.3 Analysis

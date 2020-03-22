@@ -2,6 +2,11 @@
 
 In the instance search task, given a image with one or multiple object bounding box(es), you are required to retrive images containing similar objects and moreover, locate them. 
 
+|query image with obejct bounding box| retrieved image and object location 1|  retrieved image and object location 2|
+|-|-|-|
+|![](../result/Q3/match_top_0.png)|![](../result/Q3/match_top_1.png)|![](../result/Q3/match_top_2.png)|
+
+
 In this post, I introduce my CNN based methodlogy and implementation. You can access all code on github: 
 
 Basically, I use [VGG16](https://arxiv.org/abs/1409.1556) + [RMAC (regional maximum activation of convolutions)](https://arxiv.org/abs/1511.05879) layer to get feature representation for retrieval and object localization.

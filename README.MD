@@ -24,16 +24,16 @@ TBA.
 
 ## 2. How to use
 
-Go to the [Demo.ipynb](https://github.com/rayleizhu/CNN-CBIR/blob/master/Demo.ipynb) for a step-by-step tutorial. 
-If you want to further develop based on this repository, you may refer to section 4:  design, implementation, features and discussion.
+Step-by-step tutorial: [Demo.ipynb](https://github.com/rayleizhu/CNN-CBIR/blob/master/Demo.ipynb)  
+
+Dataset: [google drive](https://drive.google.com/file/d/1Owlw7OdzjcCcE8MHWzPdVuPcy1ndlW2u/view).
+
+If you want to further develop based on this repository, you may refer to section 4 (not finished yet):  design, implementation, features and discussion.
 
 
 ## 3. Methodology
 
-* You can refer to the methodology introduction [here](https://github.com/rayleizhu/CNN-CBIR/blob/master/docs/methodology.MD).
-
-* But you are highly recommended to view it on my blog [Instance Search with CNN](http://rayleizhu.com/?p=457), where Latex syntax and UML flowchart is supported. 
-
+* Methodology introduction: [[github](https://github.com/rayleizhu/CNN-CBIR/blob/master/docs/methodology.MD)] | [[my blog](http://rayleizhu.com/?p=457)] (recomended, for better view of mathematical notations and flowchart)
 
 
 ## 4.  Design, implementation, features, discussion

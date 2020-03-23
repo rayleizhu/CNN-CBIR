@@ -26,7 +26,7 @@ TBA.
 
 Step-by-step tutorial: [Demo.ipynb](https://github.com/rayleizhu/CNN-CBIR/blob/master/Demo.ipynb)  
 
-Dataset: [google drive](https://drive.google.com/file/d/1Owlw7OdzjcCcE8MHWzPdVuPcy1ndlW2u/view).
+Dataset(google drive): [pg_data](https://drive.google.com/file/d/1Owlw7OdzjcCcE8MHWzPdVuPcy1ndlW2u/view) | [supplementary](https://drive.google.com/file/d/1swUy1dcfPQnoTLWUT7S_rwPnFVFENPYW/view)
 
 If you want to further develop based on this repository, you may refer to section 4 (not finished yet):  design, implementation, features and discussion.
 

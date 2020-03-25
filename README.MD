@@ -78,7 +78,6 @@ If you want to further develop based on this repository, you may refer to sectio
 **Currently, the implementation is slightly different from the design:**
 * Function names
 * BOWFeatureExtractor is not implemented yet, coming soon. [SIFT-BOW-CIBR](https://github.com/rayleizhu/SIFT-BOW-CBIR)
-* CNNFeatureExtractor support on ResNet etc. is to be added
 
 ### 4.2 implementation
 
